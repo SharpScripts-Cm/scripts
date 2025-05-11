@@ -89,6 +89,7 @@ local Window = Rayfield:CreateWindow({
 local Aimbot = Window:CreateTab("Aimbot 🎯")
 local AntiAim = Window:CreateTab("Anti-Aim 😡")
 local Misc = Window:CreateTab("Misc 🤷‍♂️")
+local Pierdolinko = Window:CreateTab("Dookie 💩")
 
 local fovCircle = Drawing.new("Circle")
 fovCircle.Thickness = 2
@@ -1221,17 +1222,21 @@ local function updateESP()
 
             -- Health
             local bar = espHealthBars[player]
-            if showHealthBar then
-                local ratio = hum.Health / hum.MaxHealth
-                local height = boxSize.Y * ratio
-                local topY = screenPos.Y - boxSize.Y / 2
-                local bottomY = topY + height
-                bar.From = Vector2.new(screenPos.X - boxSize.X / 2 - 4, bottomY)
-                bar.To = Vector2.new(screenPos.X - boxSize.X / 2 - 4, topY)
-                bar.Visible = onScreen
-            else
-                bar.Visible = false
-            end
+if showHealthBar then
+    local ratio = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+    local fullHeight = boxSize.Y
+    local height = fullHeight * ratio
+    local topY = screenPos.Y - fullHeight / 2
+    local bottomY = topY + height
+
+    bar.From = Vector2.new(screenPos.X - boxSize.X / 2 - 4, bottomY)
+    bar.To = Vector2.new(screenPos.X - boxSize.X / 2 - 4, topY)
+    bar.Color = Color3.fromRGB(255 * (1 - ratio), 255 * ratio, 0) -- red to green
+    bar.Visible = onScreen
+else
+    bar.Visible = false
+end
+
         else
             box.Visible = false
             espTracers[player].Visible = false
@@ -1268,7 +1273,7 @@ local espToggle = Misc:CreateToggle({
 })
 
 -- Tracer Toggle
-local tracerToggle = Aimbot:CreateToggle({
+local tracerToggle = Misc:CreateToggle({
     Name = "ESP Tracers",
     CurrentValue = false,
     Flag = "ESP_Tracers",
@@ -1278,7 +1283,7 @@ local tracerToggle = Aimbot:CreateToggle({
 })
 
 -- Distance Toggle
-local distanceToggle = Aimbot:CreateToggle({
+local distanceToggle = Misc:CreateToggle({
     Name = "Show Distance",
     CurrentValue = false,
     Flag = "ESP_Distance",
@@ -1288,7 +1293,7 @@ local distanceToggle = Aimbot:CreateToggle({
 })
 
 -- Health Bar Toggle
-local healthToggle = Aimbot:CreateToggle({
+local healthToggle = Misc:CreateToggle({
     Name = "Show Health Bars",
     CurrentValue = false,
     Flag = "ESP_Health",
@@ -1319,5 +1324,106 @@ task.spawn(function()
         end
         if whitelistDropdown then whitelistDropdown:Refresh(names, true) end
         task.wait(120)
+    end
+end)
+
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local UserInputService = game:GetService("UserInputService")
+
+-- Initial Settings
+local flyEnabled = false
+local flySpeed = 50
+local jumpBoost = 50
+local isFlying = false
+local velocity = Vector3.new()
+
+-- Create Sliders for Speed and Jump Boost under the Pierdolinko tab
+local speedSlider = Pierdolinko:CreateSlider({
+   Name = "Fly Speed",
+   Range = {0, 200},  -- Can adjust range based on your needs
+   Increment = 5,
+   Suffix = "Speed",
+   CurrentValue = 50,  -- Default fly speed
+   Flag = "FlySpeed",
+   Callback = function(Value)
+       flySpeed = Value
+   end,
+})
+
+local jumpSlider = Pierdolinko:CreateSlider({
+   Name = "Jump Boost",
+   Range = {0, 200},  -- Adjust to your needs
+   Increment = 5,
+   Suffix = "Jump",
+   CurrentValue = 50,  -- Default jump boost
+   Flag = "JumpBoost",
+   Callback = function(Value)
+       jumpBoost = Value
+   end,
+})
+
+-- Fly function to enable/disable flying
+local function toggleFly()
+    if flyEnabled then
+        -- Start flying
+        if not isFlying then
+            isFlying = true
+            velocity = Vector3.new(0, jumpBoost, 0) -- Initialize the jump boost
+            local bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.MaxForce = Vector3.new(400000, 400000, 400000)
+            bodyVelocity.Velocity = velocity
+            bodyVelocity.Parent = LocalPlayer.Character.HumanoidRootPart
+            local bodyGyro = Instance.new("BodyGyro")
+            bodyGyro.MaxTorque = Vector3.new(400000, 400000, 400000)
+            bodyGyro.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame
+            bodyGyro.Parent = LocalPlayer.Character.HumanoidRootPart
+        end
+    else
+        -- Stop flying
+        if isFlying then
+            isFlying = false
+            for _, v in pairs(LocalPlayer.Character.HumanoidRootPart:GetChildren()) do
+                if v:IsA("BodyVelocity") or v:IsA("BodyGyro") then
+                    v:Destroy()
+                end
+            end
+        end
+    end
+end
+
+-- Fly Toggle
+local flyToggle = Pierdolinko:CreateToggle({
+   Name = "Fly",
+   CurrentValue = false,
+   Flag = "Fly_Toggle",
+   Callback = function(Value)
+       flyEnabled = Value
+       toggleFly()  -- Call the function when toggle is pressed
+   end,
+})
+
+-- Update Fly Speed during flight
+RunService.RenderStepped:Connect(function()
+    if isFlying then
+        local humanoidRootPart = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if humanoidRootPart then
+            -- Adjust the velocity based on the flySpeed and direction
+            velocity = Vector3.new(0, jumpBoost, flySpeed)
+            humanoidRootPart.BodyVelocity.Velocity = velocity
+        end
+    end
+end)
+
+-- Jump Boost functionality
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.Space then
+        if isFlying then
+            -- Apply jump boost while flying
+            velocity = Vector3.new(0, jumpBoost, 0)  -- Reset vertical velocity for jump boost
+        end
     end
 end)
